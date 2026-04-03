@@ -32,6 +32,9 @@ export function getNavLabelFromPath(pathname) {
   if (parts[0] === "student" && parts[1] === "leaderboard") {
     return "Leaderboard";
   }
+  if (parts[0] === "student" && parts[1] === "profile" && parts[2] === "edit") {
+    return "Edit profile";
+  }
   const segment = parts[parts.length - 1] ?? "";
   const item = STUDENT_NAV_ITEMS.find((n) => n.segment === segment);
   return item?.label ?? "Dashboard";

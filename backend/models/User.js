@@ -24,6 +24,29 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "organizer", "student"],
       default: "student",
     },
+    /** Optional student profile fields (editable via PATCH /api/users/profile). */
+    academicYear: {
+      type: String,
+      trim: true,
+    },
+    faculty: {
+      type: String,
+      trim: true,
+    },
+    studentId: {
+      type: String,
+      trim: true,
+    },
+    /** Optional; aligned with player age rules (17–120). */
+    age: {
+      type: Number,
+      min: 17,
+      max: 120,
+    },
+    skills: {
+      type: [String],
+      default: [],
+    },
   },
   {
     timestamps: true,

@@ -4,8 +4,10 @@ const router = express.Router();
 const {
   createPlayer,
   getAllPlayers,
+  getPlayersForCurrentUser,
   getPlayerById,
   updatePlayer,
+  deletePlayer,
 } = require("../controllers/playerController");
 
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
@@ -16,10 +18,16 @@ router.post("/", protect, authorizeRoles("admin", "organizer"), createPlayer);
 // Get all players
 router.get("/", protect, getAllPlayers);
 
+// Linked player(s) for logged-in user (must be registered before /:id)
+router.get("/me", protect, getPlayersForCurrentUser);
+
 // Get single player
 router.get("/:id", protect, getPlayerById);
 
 // Update player
 router.put("/:id", protect, authorizeRoles("admin", "organizer"), updatePlayer);
+
+// Delete player
+router.delete("/:id", protect, authorizeRoles("admin", "organizer"), deletePlayer);
 
 module.exports = router;

@@ -20,9 +20,10 @@ const playerSchema = new mongoose.Schema(
       trim: true,
       lowercase: true,
     },
+    /** Faculty name (same values as student profile); stored under legacy key `department` in API payloads. */
     department: {
       type: String,
-      required: [true, "Department is required"],
+      required: [true, "Faculty is required"],
       trim: true,
     },
     age: {

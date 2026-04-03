@@ -7,9 +7,6 @@ function isDigitsOnly(str) {
   return s.length > 0 && /^[0-9]+$/.test(s);
 }
 
-// @desc    Create venue
-// @route   POST /api/venues
-// @access  Private (Admin, Organizer)
 const createVenue = async (req, res) => {
   try {
     const { venueName, location, capacity, status, availableDates } = req.body;

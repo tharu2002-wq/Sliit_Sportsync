@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { createPlayer, getPlayerById, updatePlayer } from "../../../api/players";
 import { Button } from "../../../components/ui/Button";
@@ -6,13 +6,16 @@ import { LoadingState } from "../../../components/ui/LoadingSpinner";
 import { SelectField } from "../../../components/ui/SelectField";
 import { TextAreaField } from "../../../components/ui/TextAreaField";
 import { TextField } from "../../../components/ui/TextField";
-import { PLAYER_DEPARTMENTS } from "../../../constants/playerDepartments";
+import {
+  FACULTY_OPTIONS,
+  optionsWithLegacyIfNeeded,
+} from "../../../constants/studentProfileOptions";
 import { PLAYER_GENDER_OPTIONS } from "../../../constants/playerGender";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { formatSportTypesForInput, parseSportTypesInput } from "../../../utils/playerFormUtils";
 import {
   getPlayerAgeError,
-  getPlayerDepartmentError,
+  getPlayerFacultyError,
   getPlayerEmailError,
   getSportTypesInputError,
   getStudentIdError,
@@ -23,7 +26,7 @@ const emptyForm = {
   studentId: "",
   fullName: "",
   email: "",
-  department: "",
+  faculty: "",
   age: "",
   gender: "",
   sportTypesRaw: "",
@@ -68,7 +71,7 @@ export default function AdminPlayerFormPage() {
           studentId: p.studentId ?? "",
           fullName: p.fullName ?? "",
           email: p.email ?? "",
-          department: p.department ?? "",
+          faculty: p.department ?? "",
           age: p.age != null ? String(p.age) : "",
           gender: p.gender ?? "",
           sportTypesRaw: formatSportTypesForInput(p.sportTypes),
@@ -84,6 +87,11 @@ export default function AdminPlayerFormPage() {
     };
   }, [isEdit, playerId]);
 
+  const facultySelectOptions = useMemo(
+    () => optionsWithLegacyIfNeeded(FACULTY_OPTIONS, form.faculty),
+    [form.faculty]
+  );
+
   const validate = () => {
     const next = {};
 
@@ -96,8 +104,8 @@ export default function AdminPlayerFormPage() {
     const emailErr = getPlayerEmailError(form.email);
     if (emailErr) next.email = emailErr;
 
-    const deptErr = getPlayerDepartmentError(form.department);
-    if (deptErr) next.department = deptErr;
+    const facErr = getPlayerFacultyError(form.faculty);
+    if (facErr) next.faculty = facErr;
 
     const ageErr = getPlayerAgeError(form.age);
     if (ageErr) next.age = ageErr;
@@ -121,7 +129,7 @@ export default function AdminPlayerFormPage() {
       studentId: form.studentId.trim(),
       fullName: form.fullName.trim(),
       email: form.email.trim().toLowerCase(),
-      department: form.department.trim(),
+      department: form.faculty.trim(),
       age: ageNum,
       gender: form.gender,
       sportTypes: parseSportTypesInput(form.sportTypesRaw),
@@ -219,26 +227,21 @@ export default function AdminPlayerFormPage() {
             autoComplete="email"
           />
           <SelectField
-            id="player-department"
-            name="department"
-            label="Department"
-            value={form.department}
+            id="player-faculty"
+            name="faculty"
+            label="Faculty"
+            value={form.faculty}
             onChange={(e) => {
-              update({ department: e.target.value });
-              clearFieldError("department");
+              update({ faculty: e.target.value });
+              clearFieldError("faculty");
             }}
-            error={fieldErrors.department}
+            error={fieldErrors.faculty}
             required
           >
-            <option value="">Select…</option>
-            {form.department && !PLAYER_DEPARTMENTS.includes(form.department) ? (
-              <option value={form.department}>
-                {form.department} (not in list — pick a department below)
-              </option>
-            ) : null}
-            {PLAYER_DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            <option value="">Select faculty…</option>
+            {facultySelectOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </SelectField>
