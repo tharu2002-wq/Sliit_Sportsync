@@ -26,7 +26,7 @@ export async function deleteVenue(id) {
 }
 
 /**
- * Partial update: `status` and/or `availableDates` (matches PATCH /venues/:id/availability).
+ * Partial update: `status` and/or `unavailableDates` (matches PATCH /venues/:id/availability).
  * @returns {{ message?: string; venue: unknown }}
  */
 export async function patchVenueAvailability(id, body) {

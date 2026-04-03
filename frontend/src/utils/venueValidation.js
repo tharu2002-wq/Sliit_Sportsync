@@ -51,3 +51,15 @@ export function getVenueStatusError(raw) {
   if (!ALLOWED_STATUS.has(s)) return "Select a valid status";
   return null;
 }
+
+/**
+ * @param {unknown} sports Selected sport labels from the venue form.
+ * @returns {string | null}
+ */
+export function getVenueSportsError(sports) {
+  const nonEmpty = Array.isArray(sports)
+    ? sports.map((s) => String(s).trim()).filter(Boolean)
+    : [];
+  if (nonEmpty.length === 0) return "Select at least one sport";
+  return null;
+}

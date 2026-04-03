@@ -23,9 +23,17 @@ const venueSchema = new mongoose.Schema(
       enum: ["available", "unavailable"],
       default: "available",
     },
-    availableDates: [
+    /** Calendar days the venue cannot be used (all other days are treated as available). */
+    unavailableDates: [
       {
         type: Date,
+      },
+    ],
+    /** At least one sport is required when creating or updating via the API. */
+    sports: [
+      {
+        type: String,
+        trim: true,
       },
     ],
   },

@@ -2,15 +2,17 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { createVenue, getVenueById, updateVenue } from "../../../api/venues";
 import { VenueAvailabilitySection } from "../../../components/admin/venues/VenueAvailabilitySection";
+import { VenueSportsSection } from "../../../components/admin/venues/VenueSportsSection";
 import { Button } from "../../../components/ui/Button";
 import { LoadingState } from "../../../components/ui/LoadingSpinner";
 import { TextField } from "../../../components/ui/TextField";
 import { getApiErrorMessage } from "../../../utils/apiError";
-import { normalizeAvailableDatesFromApi } from "../../../utils/venueUtils";
+import { normalizeUnavailableDatesFromApi } from "../../../utils/venueUtils";
 import {
   getVenueCapacityError,
   getVenueLocationError,
   getVenueNameError,
+  getVenueSportsError,
   getVenueStatusError,
 } from "../../../utils/venueValidation";
 
@@ -19,7 +21,8 @@ const emptyForm = {
   location: "",
   capacity: "",
   status: "available",
-  availableDates: [],
+  unavailableDates: [],
+  sports: [],
 };
 
 export default function AdminVenueFormPage() {
@@ -63,7 +66,8 @@ export default function AdminVenueFormPage() {
           location: v.location ?? "",
           capacity: v.capacity != null ? String(v.capacity) : "",
           status: v.status === "unavailable" ? "unavailable" : "available",
-          availableDates: normalizeAvailableDatesFromApi(v.availableDates),
+          unavailableDates: normalizeUnavailableDatesFromApi(v.unavailableDates),
+          sports: Array.isArray(v.sports) ? v.sports.map((s) => String(s).trim()).filter(Boolean) : [],
         });
       } catch (err) {
         if (!cancelled) setLoadError(getApiErrorMessage(err, "Could not load venue."));
@@ -95,6 +99,8 @@ export default function AdminVenueFormPage() {
     if (capErr) next.capacity = capErr;
     const stErr = getVenueStatusError(form.status);
     if (stErr) next.status = stErr;
+    const spErr = getVenueSportsError(form.sports);
+    if (spErr) next.sports = spErr;
     setFieldErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -110,7 +116,8 @@ export default function AdminVenueFormPage() {
       location: form.location.trim(),
       capacity,
       status: form.status,
-      availableDates: [...form.availableDates].sort(),
+      unavailableDates: [...form.unavailableDates].sort(),
+      sports: [...form.sports],
     };
     try {
       if (isEdit && venueId) {
@@ -153,8 +160,8 @@ export default function AdminVenueFormPage() {
           {isEdit ? "Edit venue" : "Create venue"}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-600">
-          Venue names must be unique. Use the availability section to control booking status and which dates are
-          flagged for this space.
+          Venue names must be unique. All calendar days are available unless you mark specific blocked dates, and you
+          can restrict which sports may use the venue.
         </p>
       </div>
 
@@ -210,14 +217,23 @@ export default function AdminVenueFormPage() {
           />
         </div>
 
+        <VenueSportsSection
+          selected={form.sports}
+          onChange={(next) => {
+            update({ sports: next });
+            clearFieldError("sports");
+          }}
+          error={fieldErrors.sports}
+        />
+
         <VenueAvailabilitySection
           status={form.status}
           onStatusChange={(v) => {
             update({ status: v });
             clearFieldError("status");
           }}
-          availableDateStrings={form.availableDates}
-          onDatesChange={(next) => update({ availableDates: next })}
+          unavailableDateStrings={form.unavailableDates}
+          onUnavailableDatesChange={(next) => update({ unavailableDates: next })}
           statusError={fieldErrors.status}
         />
 

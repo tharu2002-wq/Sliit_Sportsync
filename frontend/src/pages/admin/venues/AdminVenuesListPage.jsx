@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { getEvents } from "../../../api/events";
 import { deleteVenue, getVenues } from "../../../api/venues";
 import { AdminVenuesTable } from "../../../components/admin/venues/AdminVenuesTable";
+import { VenueDetailModal } from "../../../components/admin/venues/VenueDetailModal";
 import { ConfirmDialog } from "../../../components/admin/events/ConfirmDialog";
 import { Button } from "../../../components/ui/Button";
 import { LoadingState } from "../../../components/ui/LoadingSpinner";
@@ -13,20 +15,23 @@ import { filterVenues } from "../../../utils/venueUtils";
 
 export default function AdminVenuesListPage() {
   const [venues, setVenues] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [detailVenue, setDetailVenue] = useState(null);
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const data = await getVenues();
-      setVenues(Array.isArray(data) ? data : []);
+      const [v, ev] = await Promise.all([getVenues(), getEvents()]);
+      setVenues(Array.isArray(v) ? v : []);
+      setEvents(Array.isArray(ev) ? ev : []);
     } catch (err) {
-      setError(getApiErrorMessage(err, "Could not load venues."));
+      setError(getApiErrorMessage(err, "Could not load venues or events."));
     } finally {
       setLoading(false);
     }
@@ -61,7 +66,8 @@ export default function AdminVenuesListPage() {
         <div>
           <h1 className="text-2xl font-black tracking-tight text-gray-900 md:text-3xl">Venue management</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-600">
-            View campus venues, create and update details, and manage booking status and available dates.
+            View campus venues, create and update details, and manage booking status and blocked dates. Click a venue
+            name to open a summary with scheduling info and upcoming events.
           </p>
         </div>
         <Button to="/admin/venues/new" variant="primary" size="sm" className="shrink-0">
@@ -113,9 +119,15 @@ export default function AdminVenuesListPage() {
             No venues match the current filters. Try clearing search or status.
           </p>
         ) : (
-          <AdminVenuesTable venues={filtered} onDeleteClick={setDeleteTarget} />
+          <AdminVenuesTable
+            venues={filtered}
+            onDeleteClick={setDeleteTarget}
+            onVenueClick={setDetailVenue}
+          />
         )}
       </div>
+
+      <VenueDetailModal venue={detailVenue} events={events} onClose={() => setDetailVenue(null)} />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}

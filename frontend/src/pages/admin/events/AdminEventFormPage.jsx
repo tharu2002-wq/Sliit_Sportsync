@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { createEvent, getEventById, updateEvent } from "../../../api/events";
+import { createEvent, getEventById, getEvents, updateEvent } from "../../../api/events";
 import { getTeams } from "../../../api/teams";
 import { getVenues } from "../../../api/venues";
 import { TeamPicker } from "../../../components/admin/events/TeamPicker";
@@ -13,6 +13,11 @@ import { EVENT_STATUS_OPTIONS } from "../../../constants/eventStatus";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { refToId, refsToIds, toDateInputValue } from "../../../utils/eventFormUtils";
 import { getTitleOrSportTypeError, getTodayDateInputValue } from "../../../utils/eventValidation";
+import {
+  venueAllowsDateRange,
+  venueHasOverlappingEventBooking,
+  venueSupportsSport,
+} from "../../../utils/venueUtils";
 
 const emptyForm = {
   title: "",
@@ -33,6 +38,7 @@ export default function AdminEventFormPage() {
   const [form, setForm] = useState(emptyForm);
   const [teams, setTeams] = useState([]);
   const [venues, setVenues] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loadingMeta, setLoadingMeta] = useState(true);
   const [loadingEvent, setLoadingEvent] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -45,13 +51,14 @@ export default function AdminEventFormPage() {
       setError("");
       setLoadingMeta(true);
       try {
-        const [t, v] = await Promise.all([getTeams(), getVenues()]);
+        const [t, v, evs] = await Promise.all([getTeams(), getVenues(), getEvents()]);
         if (!cancelled) {
           setTeams(Array.isArray(t) ? t : []);
           setVenues(Array.isArray(v) ? v : []);
+          setEvents(Array.isArray(evs) ? evs : []);
         }
       } catch (err) {
-        if (!cancelled) setError(getApiErrorMessage(err, "Could not load teams or venues."));
+        if (!cancelled) setError(getApiErrorMessage(err, "Could not load teams, venues, or events."));
       } finally {
         if (!cancelled) setLoadingMeta(false);
       }
@@ -94,13 +101,87 @@ export default function AdminEventFormPage() {
     };
   }, [isEdit, eventId]);
 
-  const venueOptions = useMemo(() => {
+  /**
+   * Only venues that allow this event’s sport are listed. Among those, unusable options stay visible but disabled
+   * (unavailable venue, blocked dates, or overlapping event booking).
+   */
+  const venueSelectRows = useMemo(() => {
     if (!venues.length) return [];
-    if (!isEdit || !form.venueId) {
-      return venues.filter((v) => v.status === "available");
+    const sport = form.sportType?.trim() ?? "";
+    const reservesVenue = form.status === "upcoming" || form.status === "ongoing";
+    const hasDates = Boolean(form.startDate && form.endDate);
+
+    return venues
+      .filter((v) => venueSupportsSport(v, sport))
+      .map((v) => {
+        let disabled = false;
+        let reason = "";
+
+        if (v.status !== "available") {
+          disabled = true;
+          reason = "venue unavailable";
+        } else if (hasDates && !venueAllowsDateRange(v, form.startDate, form.endDate)) {
+          disabled = true;
+          reason = "blocked dates on venue";
+        } else if (
+          reservesVenue &&
+          hasDates &&
+          venueHasOverlappingEventBooking(events, {
+            venueId: String(v._id),
+            startYmd: form.startDate,
+            endYmd: form.endDate,
+            excludeEventId: isEdit ? eventId : undefined,
+          })
+        ) {
+          disabled = true;
+          reason = "already booked for overlapping dates";
+        }
+
+        return { venue: v, disabled, reason };
+      });
+  }, [
+    venues,
+    events,
+    form.sportType,
+    form.startDate,
+    form.endDate,
+    form.status,
+    isEdit,
+    eventId,
+  ]);
+
+  useEffect(() => {
+    if (!form.venueId || !venues.length) return;
+    const v = venues.find((x) => String(x._id) === String(form.venueId));
+    if (!v) return;
+    const sport = form.sportType?.trim() ?? "";
+    const datesOk =
+      !form.startDate || !form.endDate || venueAllowsDateRange(v, form.startDate, form.endDate);
+    const reservesVenue = form.status === "upcoming" || form.status === "ongoing";
+    const booked =
+      reservesVenue &&
+      form.startDate &&
+      form.endDate &&
+      venueHasOverlappingEventBooking(events, {
+        venueId: String(v._id),
+        startYmd: form.startDate,
+        endYmd: form.endDate,
+        excludeEventId: isEdit ? eventId : undefined,
+      });
+    if (!venueSupportsSport(v, sport) || !datesOk || booked) {
+      setForm((prev) => ({ ...prev, venueId: "" }));
     }
-    return venues.filter((v) => v.status === "available" || String(v._id) === String(form.venueId));
-  }, [venues, isEdit, form.venueId]);
+  }, [
+    venues,
+    events,
+    form.venueId,
+    form.sportType,
+    form.startDate,
+    form.endDate,
+    form.status,
+    isEdit,
+    eventId,
+  ]);
 
   const update = (patch) => setForm((prev) => ({ ...prev, ...patch }));
 
@@ -175,7 +256,8 @@ export default function AdminEventFormPage() {
           {isEdit ? "Edit event" : "Create event"}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-gray-600">
-          Choose a venue and teams that already exist in the system. Dates are stored as calendar days (same as the API).
+          Enter the sport type first so the venue list only shows spaces that allow it. Dates are calendar days; while an
+          event is upcoming or ongoing, its venue cannot overlap another reserving event on the same days.
         </p>
       </div>
 
@@ -232,23 +314,34 @@ export default function AdminEventFormPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            id="event-venue"
-            name="venue"
-            label="Venue"
-            value={form.venueId}
-            onChange={(e) => update({ venueId: e.target.value })}
-            error={fieldErrors.venueId}
-            required
-          >
-            <option value="">Select a venue…</option>
-            {venueOptions.map((v) => (
-              <option key={v._id} value={v._id}>
-                {v.venueName}
-                {v.status !== "available" ? " (unavailable)" : ""} — {v.location}
-              </option>
-            ))}
-          </SelectField>
+          <div className="min-w-0">
+            <SelectField
+              id="event-venue"
+              name="venue"
+              label="Venue"
+              value={form.venueId}
+              onChange={(e) => update({ venueId: e.target.value })}
+              error={fieldErrors.venueId}
+              required
+            >
+              <option value="">Select a venue…</option>
+              {venueSelectRows.map(({ venue: v, disabled, reason }) => (
+                <option
+                  key={v._id}
+                  value={v._id}
+                  disabled={disabled}
+                  title={disabled ? `Not selectable: ${reason}` : undefined}
+                >
+                  {v.venueName} — {v.location}
+                  {disabled ? ` (${reason})` : ""}
+                </option>
+              ))}
+            </SelectField>
+            <p className="mt-1.5 text-xs text-gray-500">
+              Only venues configured for this sport are listed. If dates clash with admin-blocked days or another
+              reserving event, that venue stays visible but disabled.
+            </p>
+          </div>
 
           <SelectField
             id="event-status"

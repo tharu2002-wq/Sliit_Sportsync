@@ -19,6 +19,7 @@ import {
   toDateInputValue,
 } from "../../../utils/matchFormUtils";
 import { getTodayDateInputValue } from "../../../utils/eventValidation";
+import { venueAllowsSingleDate, venueSupportsSport } from "../../../utils/venueUtils";
 
 const emptyForm = {
   eventId: "",
@@ -115,11 +116,28 @@ export default function AdminMatchFormPage() {
 
   const venueOptions = useMemo(() => {
     if (!venues.length) return [];
+    const sport = selectedEvent?.sportType?.trim() ?? "";
+    const eligible = (v) => {
+      if (v.status !== "available") return false;
+      if (!venueSupportsSport(v, sport)) return false;
+      if (form.date && !venueAllowsSingleDate(v, form.date)) return false;
+      return true;
+    };
     if (!isEdit || !form.venueId) {
-      return venues.filter((v) => v.status === "available");
+      return venues.filter(eligible);
     }
-    return venues.filter((v) => v.status === "available" || String(v._id) === String(form.venueId));
-  }, [venues, isEdit, form.venueId]);
+    return venues.filter((v) => eligible(v) || String(v._id) === String(form.venueId));
+  }, [venues, isEdit, form.venueId, selectedEvent, form.date]);
+
+  useEffect(() => {
+    if (!form.venueId || !venues.length || !form.date || !selectedEvent) return;
+    const v = venues.find((x) => String(x._id) === String(form.venueId));
+    if (!v) return;
+    const sport = selectedEvent.sportType?.trim() ?? "";
+    if (!venueSupportsSport(v, sport) || !venueAllowsSingleDate(v, form.date)) {
+      setForm((prev) => ({ ...prev, venueId: "" }));
+    }
+  }, [venues, form.venueId, form.date, selectedEvent]);
 
   const dateBounds = useMemo(() => {
     if (!selectedEvent) return { min: "", max: "" };
@@ -133,7 +151,7 @@ export default function AdminMatchFormPage() {
 
   const handleEventChange = (e) => {
     const v = e.target.value;
-    setForm((prev) => ({ ...prev, eventId: v, teamA: "", teamB: "", date: "" }));
+    setForm((prev) => ({ ...prev, eventId: v, teamA: "", teamB: "", date: "", venueId: "" }));
   };
 
   const validate = () => {

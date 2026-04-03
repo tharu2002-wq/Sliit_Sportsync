@@ -4,6 +4,7 @@ const Team = require("../models/Team");
 const Player = require("../models/Player");
 const Match = require("../models/Match");
 const Result = require("../models/Result");
+const { venueSportError, venueUnavailableRangeError } = require("../utils/venueRules");
 
 // normalize date to beginning of day
 const normalizeDate = (dateValue) => {
@@ -71,6 +72,27 @@ async function syncAllNonCancelledEventsScheduleStatus() {
   }
 }
 
+/** Only these statuses reserve the venue on their date range (no double-booking). */
+const VENUE_RESERVING_STATUSES = ["upcoming", "ongoing"];
+
+function statusReservesVenue(status) {
+  return VENUE_RESERVING_STATUSES.includes(status);
+}
+
+/** @param {unknown} excludeEventId omit to skip exclusion */
+async function findOverlappingVenueBooking(venueId, rangeStart, rangeEnd, excludeEventId) {
+  const filter = {
+    venue: venueId,
+    status: { $in: VENUE_RESERVING_STATUSES },
+    startDate: { $lte: rangeEnd },
+    endDate: { $gte: rangeStart },
+  };
+  if (excludeEventId) {
+    filter._id = { $ne: excludeEventId };
+  }
+  return Event.findOne(filter).select("title startDate endDate").lean();
+}
+
 // @desc    Create event
 // @route   POST /api/events
 // @access  Private (Admin, Organizer)
@@ -120,6 +142,31 @@ const createEvent = async (req, res) => {
 
     if (foundVenue.status !== "available") {
       return res.status(400).json({ message: "Venue is currently unavailable" });
+    }
+
+    const sportErr = venueSportError(foundVenue, sportType.trim());
+    if (sportErr) {
+      return res.status(400).json({ message: sportErr });
+    }
+
+    const unavailErr = venueUnavailableRangeError(foundVenue, normalizedStartDate, normalizedEndDate);
+    if (unavailErr) {
+      return res.status(400).json({ message: unavailErr });
+    }
+
+    if (statusReservesVenue(initialStatus)) {
+      await syncAllNonCancelledEventsScheduleStatus();
+      const clash = await findOverlappingVenueBooking(
+        venue,
+        normalizedStartDate,
+        normalizedEndDate,
+        null
+      );
+      if (clash) {
+        return res.status(400).json({
+          message: `This venue is already booked for overlapping dates by another event (“${clash.title}”).`,
+        });
+      }
     }
 
     const duplicateEvent = await Event.findOne({
@@ -295,6 +342,35 @@ const updateEvent = async (req, res) => {
     const foundVenue = await Venue.findById(finalVenue);
     if (!foundVenue) {
       return res.status(404).json({ message: "Venue not found" });
+    }
+
+    if (foundVenue.status !== "available") {
+      return res.status(400).json({ message: "Venue is currently unavailable" });
+    }
+
+    const sportErr = venueSportError(foundVenue, finalSportType.trim());
+    if (sportErr) {
+      return res.status(400).json({ message: sportErr });
+    }
+
+    const unavailErr = venueUnavailableRangeError(foundVenue, finalStartDate, finalEndDate);
+    if (unavailErr) {
+      return res.status(400).json({ message: unavailErr });
+    }
+
+    if (statusReservesVenue(finalStatus)) {
+      await syncAllNonCancelledEventsScheduleStatus();
+      const clash = await findOverlappingVenueBooking(
+        finalVenue,
+        finalStartDate,
+        finalEndDate,
+        event._id
+      );
+      if (clash) {
+        return res.status(400).json({
+          message: `This venue is already booked for overlapping dates by another event (“${clash.title}”).`,
+        });
+      }
     }
 
     const duplicateEvent = await Event.findOne({

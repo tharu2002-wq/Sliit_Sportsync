@@ -2,6 +2,35 @@ const Venue = require("../models/Venue");
 const Event = require("../models/Event");
 const Match = require("../models/Match");
 
+function normalizeUnavailableDatesInput(raw) {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) return [];
+  const byTime = new Map();
+  for (const x of raw) {
+    const d = new Date(x);
+    if (Number.isNaN(d.getTime())) continue;
+    d.setHours(0, 0, 0, 0);
+    byTime.set(d.getTime(), d);
+  }
+  return Array.from(byTime.values()).sort((a, b) => a.getTime() - b.getTime());
+}
+
+function normalizeSportsInput(raw) {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const s of raw) {
+    const t = String(s).trim();
+    if (!t) continue;
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+  }
+  return out;
+}
+
 function isDigitsOnly(str) {
   const s = String(str ?? "").trim();
   return s.length > 0 && /^[0-9]+$/.test(s);
@@ -9,7 +38,7 @@ function isDigitsOnly(str) {
 
 const createVenue = async (req, res) => {
   try {
-    const { venueName, location, capacity, status, availableDates } = req.body;
+    const { venueName, location, capacity, status, unavailableDates, sports } = req.body;
 
     const nameTrim = String(venueName ?? "").trim();
     const locationTrim = String(location ?? "").trim();
@@ -32,12 +61,18 @@ const createVenue = async (req, res) => {
       return res.status(400).json({ message: "Venue name already exists" });
     }
 
+    const sportsNorm = normalizeSportsInput(sports);
+    if (sportsNorm.length === 0) {
+      return res.status(400).json({ message: "Select at least one sport for this venue" });
+    }
+
     const venue = await Venue.create({
       venueName: nameTrim,
       location: locationTrim,
       capacity,
       status,
-      availableDates,
+      unavailableDates: normalizeUnavailableDatesInput(unavailableDates),
+      sports: sportsNorm,
     });
 
     return res.status(201).json(venue);
@@ -80,7 +115,7 @@ const getVenueById = async (req, res) => {
 // @access  Private (Admin, Organizer)
 const updateVenue = async (req, res) => {
   try {
-    const { venueName, location, capacity, status, availableDates } = req.body;
+    const { venueName, location, capacity, status, unavailableDates, sports } = req.body;
 
     const venue = await Venue.findById(req.params.id);
 
@@ -118,7 +153,16 @@ const updateVenue = async (req, res) => {
 
     if (capacity !== undefined) venue.capacity = capacity;
     if (status !== undefined) venue.status = status;
-    if (availableDates !== undefined) venue.availableDates = availableDates;
+    if (unavailableDates !== undefined) {
+      venue.unavailableDates = normalizeUnavailableDatesInput(unavailableDates);
+    }
+    if (sports !== undefined) {
+      const sportsNorm = normalizeSportsInput(sports);
+      if (sportsNorm.length === 0) {
+        return res.status(400).json({ message: "Select at least one sport for this venue" });
+      }
+      venue.sports = sportsNorm;
+    }
 
     const updatedVenue = await venue.save();
 
@@ -133,7 +177,7 @@ const updateVenue = async (req, res) => {
 // @access  Private (Admin, Organizer)
 const updateVenueAvailability = async (req, res) => {
   try {
-    const { status, availableDates } = req.body;
+    const { status, unavailableDates } = req.body;
 
     const venue = await Venue.findById(req.params.id);
 
@@ -145,8 +189,8 @@ const updateVenueAvailability = async (req, res) => {
       venue.status = status;
     }
 
-    if (availableDates) {
-      venue.availableDates = availableDates;
+    if (unavailableDates !== undefined) {
+      venue.unavailableDates = normalizeUnavailableDatesInput(unavailableDates);
     }
 
     const updatedVenue = await venue.save();
