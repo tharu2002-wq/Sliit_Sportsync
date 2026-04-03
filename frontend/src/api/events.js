@@ -31,3 +31,9 @@ export async function cancelEvent(id) {
   const { data } = await api.patch(`/events/${id}/cancel`);
   return data;
 }
+
+/** Removes a cancelled event from the system (server rejects non-cancelled). */
+export async function deleteCancelledEvent(id) {
+  const { data } = await api.delete(`/events/${id}`);
+  return data;
+}

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import eventPlaceholder from "../../../assets/event.jpg";
 import { getEvents } from "../../../api/events";
 import { EventCard } from "../../../components/events/EventCard";
 import { DashboardPageHeader } from "../../../components/student-dashboard/DashboardPageHeader";
@@ -7,7 +6,7 @@ import { LoadingState } from "../../../components/ui/LoadingSpinner";
 import { SearchBar } from "../../../components/ui/SearchBar";
 import { SelectFilter } from "../../../components/ui/SelectFilter";
 import { getApiErrorMessage } from "../../../utils/apiError";
-import { collectSportTypes, filterEvents, isPastEvent } from "../../../utils/eventUtils";
+import { collectSportTypes, daysUntilCalendarDate, filterEvents, isPastEvent } from "../../../utils/eventUtils";
 
 function sortUpcoming(a, b) {
   return new Date(a.startDate) - new Date(b.startDate);
@@ -17,7 +16,7 @@ function sortPast(a, b) {
   return new Date(b.endDate) - new Date(a.endDate);
 }
 
-function EventSection({ id, title, events, emptyHint, imageSrc }) {
+function EventSection({ id, title, events, emptyHint, ongoingLive = false, showCountdown = false }) {
   return (
     <section className="mt-10 first:mt-0" aria-labelledby={id}>
       <h2 id={id} className="text-lg font-black tracking-tight text-gray-900">
@@ -33,8 +32,9 @@ function EventSection({ id, title, events, emptyHint, imageSrc }) {
             <li key={event._id}>
               <EventCard
                 event={event}
-                imageSrc={imageSrc}
                 detailTo={`/student/events/${event._id}`}
+                ongoingLive={ongoingLive}
+                countdownDays={showCountdown ? daysUntilCalendarDate(event.startDate) : null}
               />
             </li>
           ))}
@@ -76,17 +76,32 @@ export default function StudentEventsPage() {
     [rawEvents, searchQuery, sportType]
   );
 
-  const { upcoming, past } = useMemo(() => {
-    const u = filtered.filter((e) => !isPastEvent(e)).sort(sortUpcoming);
-    const p = filtered.filter((e) => isPastEvent(e)).sort(sortPast);
-    return { upcoming: u, past: p };
+  const { ongoing, upcoming, completed } = useMemo(() => {
+    const active = filtered.filter((e) => e.status !== "cancelled");
+
+    const completedList = active.filter((e) => isPastEvent(e) || e.status === "completed");
+    const completedIds = new Set(completedList.map((e) => e._id));
+
+    const ongoingList = active
+      .filter((e) => !completedIds.has(e._id) && e.status === "ongoing")
+      .sort(sortUpcoming);
+
+    const upcomingList = active
+      .filter((e) => !completedIds.has(e._id) && e.status === "upcoming")
+      .sort(sortUpcoming);
+
+    completedList.sort(sortPast);
+
+    return { ongoing: ongoingList, upcoming: upcomingList, completed: completedList };
   }, [filtered]);
+
+  const hasFilters = Boolean(searchQuery.trim() || sportType);
 
   return (
     <>
       <DashboardPageHeader
         title="Events"
-        description="Browse and register for campus sports events. Upcoming events are listed first; past events are kept for reference."
+        description="Browse campus sports events. Live events are highlighted; upcoming shows a day countdown. Cancelled events are hidden."
       />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
@@ -124,26 +139,36 @@ export default function StudentEventsPage() {
       ) : (
         <>
           <EventSection
+            id="student-events-ongoing-heading"
+            title="Ongoing events"
+            events={ongoing}
+            ongoingLive
+            emptyHint={
+              hasFilters
+                ? "No ongoing events match your search or filter."
+                : "Nothing in progress right now. Check upcoming events below."
+            }
+          />
+          <EventSection
             id="student-events-upcoming-heading"
             title="Upcoming events"
             events={upcoming}
+            showCountdown
             emptyHint={
-              searchQuery.trim() || sportType
+              hasFilters
                 ? "No upcoming events match your search or filter."
-                : "No upcoming events right now. Check back later."
+                : "No upcoming events scheduled. Check back later."
             }
-            imageSrc={eventPlaceholder}
           />
           <EventSection
-            id="student-events-past-heading"
-            title="Past events"
-            events={past}
+            id="student-events-completed-heading"
+            title="Completed events"
+            events={completed}
             emptyHint={
-              searchQuery.trim() || sportType
-                ? "No past events match your search or filter."
-                : "No past events to show yet."
+              hasFilters
+                ? "No completed events match your search or filter."
+                : "No completed events to show yet."
             }
-            imageSrc={eventPlaceholder}
           />
         </>
       )}

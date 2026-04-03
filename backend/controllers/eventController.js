@@ -2,6 +2,8 @@ const Event = require("../models/Event");
 const Venue = require("../models/Venue");
 const Team = require("../models/Team");
 const Player = require("../models/Player");
+const Match = require("../models/Match");
+const Result = require("../models/Result");
 
 // normalize date to beginning of day
 const normalizeDate = (dateValue) => {
@@ -18,6 +20,56 @@ const isTodayOrFuture = (dateValue) => {
   const inputDate = normalizeDate(dateValue);
   return inputDate >= today;
 };
+
+const getTodayStart = () => {
+  const t = new Date();
+  t.setHours(0, 0, 0, 0);
+  return t;
+};
+
+/**
+ * Derives status from calendar vs today. Does not override cancelled or completed.
+ */
+function resolveScheduleDrivenStatus(eventLike) {
+  const { status, startDate, endDate } = eventLike;
+  if (status === "cancelled" || status === "completed") {
+    return null;
+  }
+
+  const today = getTodayStart();
+  const start = normalizeDate(startDate);
+  const end = normalizeDate(endDate);
+
+  let desired;
+  if (today > end) {
+    desired = "completed";
+  } else if (today >= start) {
+    desired = "ongoing";
+  } else {
+    desired = "upcoming";
+  }
+
+  return desired === status ? null : desired;
+}
+
+async function syncAllNonCancelledEventsScheduleStatus() {
+  const candidates = await Event.find({ status: { $in: ["upcoming", "ongoing"] } }).lean();
+  const ops = [];
+  for (const e of candidates) {
+    const next = resolveScheduleDrivenStatus(e);
+    if (next) {
+      ops.push({
+        updateOne: {
+          filter: { _id: e._id },
+          update: { $set: { status: next } },
+        },
+      });
+    }
+  }
+  if (ops.length) {
+    await Event.bulkWrite(ops, { ordered: false });
+  }
+}
 
 // @desc    Create event
 // @route   POST /api/events
@@ -113,6 +165,12 @@ const createEvent = async (req, res) => {
       status: initialStatus,
     });
 
+    const scheduleStatus = resolveScheduleDrivenStatus(event);
+    if (scheduleStatus) {
+      event.status = scheduleStatus;
+      await event.save();
+    }
+
     return res.status(201).json(event);
   } catch (error) {
     return res.status(500).json({ message: error.message });
@@ -124,6 +182,8 @@ const createEvent = async (req, res) => {
 // @access  Private
 const getAllEvents = async (req, res) => {
   try {
+    await syncAllNonCancelledEventsScheduleStatus();
+
     const events = await Event.find()
       .populate("venue", "venueName location capacity status")
       .populate("teams", "teamName sportType")
@@ -141,14 +201,21 @@ const getAllEvents = async (req, res) => {
 // @access  Private
 const getEventById = async (req, res) => {
   try {
-    const event = await Event.findById(req.params.id)
-      .populate("venue", "venueName location capacity status")
-      .populate("teams", "teamName sportType captain")
-      .populate("participants", "fullName studentId email");
+    const event = await Event.findById(req.params.id);
 
     if (!event) {
       return res.status(404).json({ message: "Event not found" });
     }
+
+    const scheduleStatus = resolveScheduleDrivenStatus(event);
+    if (scheduleStatus) {
+      event.status = scheduleStatus;
+      await event.save();
+    }
+
+    await event.populate("venue", "venueName location capacity status");
+    await event.populate("teams", "teamName sportType captain");
+    await event.populate("participants", "fullName studentId email");
 
     return res.status(200).json(event);
   } catch (error) {
@@ -161,6 +228,8 @@ const getEventById = async (req, res) => {
 // @access  Private
 const getUpcomingEvents = async (req, res) => {
   try {
+    await syncAllNonCancelledEventsScheduleStatus();
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -270,7 +339,13 @@ const updateEvent = async (req, res) => {
     event.status = finalStatus;
     event.description = finalDescription;
 
-    const updatedEvent = await event.save();
+    let updatedEvent = await event.save();
+
+    const scheduleStatus = resolveScheduleDrivenStatus(updatedEvent);
+    if (scheduleStatus) {
+      updatedEvent.status = scheduleStatus;
+      updatedEvent = await updatedEvent.save();
+    }
 
     return res.status(200).json(updatedEvent);
   } catch (error) {
@@ -302,6 +377,42 @@ const cancelEvent = async (req, res) => {
   }
 };
 
+// @desc    Delete cancelled event (and its matches / results)
+// @route   DELETE /api/events/:id
+// @access  Private (Admin, Organizer)
+const deleteCancelledEvent = async (req, res) => {
+  try {
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    if (event.status !== "cancelled") {
+      return res.status(400).json({
+        message: "Only cancelled events can be deleted",
+      });
+    }
+
+    const matchIds = await Match.find({ event: event._id }).distinct("_id");
+    if (matchIds.length > 0) {
+      await Result.deleteMany({ match: { $in: matchIds } });
+      await Match.deleteMany({ _id: { $in: matchIds } });
+    }
+
+    await Player.updateMany(
+      { participationHistory: event._id },
+      { $pull: { participationHistory: event._id } }
+    );
+
+    await Event.findByIdAndDelete(event._id);
+
+    return res.status(200).json({ message: "Event deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createEvent,
   getAllEvents,
@@ -309,4 +420,5 @@ module.exports = {
   getUpcomingEvents,
   updateEvent,
   cancelEvent,
+  deleteCancelledEvent,
 };

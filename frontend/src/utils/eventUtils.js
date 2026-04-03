@@ -5,6 +5,16 @@ export function startOfToday() {
   return d;
 }
 
+/** Whole calendar days from today (local) until `dateValue` (start of that day). Can be negative if the date is in the past. */
+export function daysUntilCalendarDate(dateValue) {
+  if (!dateValue) return null;
+  const today = startOfToday();
+  const target = new Date(dateValue);
+  if (Number.isNaN(target.getTime())) return null;
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
 /** Past events: ended before today, or marked completed (still ongoing cancelled events stay in upcoming). */
 export function isPastEvent(event) {
   if (!event?.endDate) return false;

@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import eventPlaceholder from "../../../assets/event.jpg";
 import { getEventById } from "../../../api/events";
 import { DashboardPageHeader } from "../../../components/student-dashboard/DashboardPageHeader";
 import { LoadingState } from "../../../components/ui/LoadingSpinner";
 import { Button } from "../../../components/ui/Button";
 import { getApiErrorMessage } from "../../../utils/apiError";
+import { getEventCardImageForSport } from "../../../utils/eventCardImages";
 import { formatEventDateRange, formatEventDateTime } from "../../../utils/eventUtils";
 import { cn } from "../../../utils/cn";
 
@@ -68,6 +68,7 @@ export default function StudentEventDetailPage() {
   const status = event.status ?? "upcoming";
   const venueName = event.venue?.venueName ?? "—";
   const venueLoc = event.venue?.location ?? "";
+  const heroImageSrc = getEventCardImageForSport(event.sportType);
 
   return (
     <>
@@ -89,7 +90,7 @@ export default function StudentEventDetailPage() {
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100">
         <div className="aspect-[21/9] w-full overflow-hidden bg-gray-100 sm:aspect-[24/9]">
           <img
-            src={eventPlaceholder}
+            src={heroImageSrc}
             alt=""
             className="h-full w-full object-cover"
             decoding="async"
