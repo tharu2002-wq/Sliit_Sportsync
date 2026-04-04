@@ -1,4 +1,4 @@
-import { formatMatchDay, formatMatchTimeRange } from "../../../utils/matchUtils";
+import { formatMatchDay, formatMatchTimeRange, getMatchSportTypeLabel } from "../../../utils/matchUtils";
 
 /**
  * Read-only match context (event, teams, schedule).
@@ -13,10 +13,16 @@ export function MatchResultSummary({ match }) {
   const teamB = match.teamB?.teamName ?? "Team B";
   const eventTitle = match.event?.title ?? "Event";
   const venue = match.venue?.venueName;
+  const sportType = getMatchSportTypeLabel(match);
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4 sm:p-5">
-      <p className="text-xs font-bold uppercase tracking-wide text-gray-500">{eventTitle}</p>
+      {sportType ? (
+        <p className="text-xs font-bold uppercase tracking-wide text-blue-700">{sportType}</p>
+      ) : null}
+      <p className={`text-xs font-bold uppercase tracking-wide text-gray-500 ${sportType ? "mt-1.5" : ""}`}>
+        {eventTitle}
+      </p>
       <p className="mt-2 text-lg font-black text-gray-900">
         {teamA} <span className="font-bold text-gray-400">vs</span> {teamB}
       </p>

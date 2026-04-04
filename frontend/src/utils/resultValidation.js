@@ -22,3 +22,15 @@ export function getResultNotesError(raw) {
   if (s.length > 2000) return "Notes must be at most 2000 characters";
   return null;
 }
+
+const MAX_PLAYER_NOTE = 500;
+
+/**
+ * @param {string} raw
+ * @returns {string | null}
+ */
+export function getPlayerNoteError(raw) {
+  const s = String(raw ?? "");
+  if (s.length > MAX_PLAYER_NOTE) return `Per-player notes must be at most ${MAX_PLAYER_NOTE} characters`;
+  return null;
+}
