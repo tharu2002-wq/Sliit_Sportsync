@@ -7,6 +7,7 @@ export const ADMIN_NAV_ITEMS = [
   { segment: "matches", label: "Match Management" },
   { segment: "teams", label: "Team Management" },
   { segment: "players", label: "Player Management" },
+  { segment: "player-requests", label: "Player requests" },
   { segment: "venues", label: "Venue Management" },
   { segment: "results", label: "Result Management" },
   { segment: "leaderboard-reports", label: "Leaderboard & Reports" },

@@ -23,7 +23,7 @@ function teamsCount(teams) {
   return teams.length;
 }
 
-export function AdminEventsTable({ events, onCancelClick }) {
+export function AdminEventsTable({ events, onCancelClick, onDeleteClick }) {
   if (events.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-12 text-center text-sm text-gray-500">
@@ -66,7 +66,17 @@ export function AdminEventsTable({ events, onCancelClick }) {
                 >
                   Cancel
                 </Button>
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="!border-2 !border-slate-800 !bg-slate-800 !text-white hover:!bg-slate-900 hover:!border-slate-900"
+                  onClick={() => onDeleteClick(ev)}
+                >
+                  Delete
+                </Button>
+              )}
             </div>
           </li>
         ))}
@@ -113,7 +123,15 @@ export function AdminEventsTable({ events, onCancelClick }) {
                       >
                         Cancel
                       </button>
-                    ) : null}
+                    ) : (
+                      <button
+                        type="button"
+                        className="rounded-lg border-2 border-slate-800 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-900 hover:border-slate-900"
+                        onClick={() => onDeleteClick(ev)}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

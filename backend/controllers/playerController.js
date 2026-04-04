@@ -1,5 +1,7 @@
 const Player = require("../models/Player");
 const Team = require("../models/Team");
+const Event = require("../models/Event");
+const PlayerRequest = require("../models/PlayerRequest");
 
 /**
  * Teams that list this player in `members` (true membership). Player.team is legacy/optional.
@@ -75,6 +77,30 @@ const createPlayer = async (req, res) => {
     plain.teams = teamsByPlayer.get(player._id.toString()) ?? [];
 
     return res.status(201).json(plain);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Players linked to the current user (same Student ID on account as on athlete record)
+// @route   GET /api/players/me
+// @access  Private
+const getPlayersForCurrentUser = async (req, res) => {
+  try {
+    const sid = req.user.studentId?.trim();
+    if (!sid) {
+      return res.status(200).json([]);
+    }
+
+    const players = await Player.find({ studentId: sid }).sort({ createdAt: -1 }).lean();
+    const teamsByPlayer = await buildTeamsByPlayerId(players);
+
+    const result = players.map((p) => ({
+      ...p,
+      teams: teamsByPlayer.get(p._id.toString()) ?? [],
+    }));
+
+    return res.status(200).json(result);
   } catch (error) {
     return res.status(500).json({ message: error.message });
   }
@@ -169,9 +195,36 @@ const updatePlayer = async (req, res) => {
   }
 };
 
+// @desc    Delete player and detach from teams / events
+// @route   DELETE /api/players/:id
+// @access  Private (admin, organizer)
+const deletePlayer = async (req, res) => {
+  try {
+    const player = await Player.findById(req.params.id);
+    if (!player) {
+      return res.status(404).json({ message: "Player not found" });
+    }
+
+    const pid = player._id;
+
+    await Team.updateMany({ members: pid }, { $pull: { members: pid } });
+    await Team.updateMany({ captain: pid }, { $unset: { captain: 1 } });
+    await Event.updateMany({ participants: pid }, { $pull: { participants: pid } });
+    await PlayerRequest.updateMany({ createdPlayer: pid }, { $unset: { createdPlayer: 1 } });
+
+    await Player.findByIdAndDelete(pid);
+
+    return res.status(200).json({ message: "Player removed", _id: pid });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createPlayer,
   getAllPlayers,
+  getPlayersForCurrentUser,
   getPlayerById,
   updatePlayer,
+  deletePlayer,
 };

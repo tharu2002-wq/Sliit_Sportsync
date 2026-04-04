@@ -2,7 +2,10 @@ import { Link } from "react-router-dom";
 import { getGenderLabel } from "../../../constants/playerGender";
 import { formatPlayerTeamsLine } from "../../../utils/playerDisplayUtils";
 
-export function AdminPlayersTable({ players }) {
+/**
+ * @param {{ players: unknown[]; deletingId?: string | null; onDeletePlayer?: (id: string, fullName: string) => void }} props
+ */
+export function AdminPlayersTable({ players, deletingId = null, onDeletePlayer }) {
   if (players.length === 0) {
     return (
       <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-12 text-center text-sm text-gray-500">
@@ -23,13 +26,23 @@ export function AdminPlayersTable({ players }) {
               {p.department} · Age {p.age} · {getGenderLabel(p.gender)}
             </p>
             <p className="mt-1 text-xs text-gray-600">Teams: {formatPlayerTeamsLine(p)}</p>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Link
                 to={`/admin/players/${p._id}/edit`}
                 className="inline-flex rounded-lg border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
               >
                 Edit
               </Link>
+              {onDeletePlayer ? (
+                <button
+                  type="button"
+                  onClick={() => onDeletePlayer(String(p._id), p.fullName ?? "Player")}
+                  disabled={deletingId === String(p._id)}
+                  className="inline-flex rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingId === String(p._id) ? "Removing…" : "Remove"}
+                </button>
+              ) : null}
             </div>
           </li>
         ))}
@@ -42,7 +55,7 @@ export function AdminPlayersTable({ players }) {
               <th className="px-4 py-3 font-bold text-gray-700">Name</th>
               <th className="px-4 py-3 font-bold text-gray-700">Student ID</th>
               <th className="px-4 py-3 font-bold text-gray-700">Email</th>
-              <th className="px-4 py-3 font-bold text-gray-700">Department</th>
+              <th className="px-4 py-3 font-bold text-gray-700">Faculty</th>
               <th className="px-4 py-3 font-bold text-gray-700">Age</th>
               <th className="px-4 py-3 font-bold text-gray-700">Gender</th>
               <th className="px-4 py-3 font-bold text-gray-700">Teams</th>
@@ -64,12 +77,24 @@ export function AdminPlayersTable({ players }) {
                   {Array.isArray(p.sportTypes) && p.sportTypes.length ? p.sportTypes.join(", ") : "—"}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <Link
-                    to={`/admin/players/${p._id}/edit`}
-                    className="rounded-lg border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
-                  >
-                    Edit
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      to={`/admin/players/${p._id}/edit`}
+                      className="rounded-lg border border-blue-600 px-3 py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                    >
+                      Edit
+                    </Link>
+                    {onDeletePlayer ? (
+                      <button
+                        type="button"
+                        onClick={() => onDeletePlayer(String(p._id), p.fullName ?? "Player")}
+                        disabled={deletingId === String(p._id)}
+                        className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {deletingId === String(p._id) ? "Removing…" : "Remove"}
+                      </button>
+                    ) : null}
+                  </div>
                 </td>
               </tr>
             ))}

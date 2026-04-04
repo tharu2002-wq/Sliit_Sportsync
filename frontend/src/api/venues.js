@@ -20,8 +20,13 @@ export async function updateVenue(id, payload) {
   return data;
 }
 
+export async function deleteVenue(id) {
+  const { data } = await api.delete(`/venues/${id}`);
+  return data;
+}
+
 /**
- * Partial update: `status` and/or `availableDates` (matches PATCH /venues/:id/availability).
+ * Partial update: `status` and/or `unavailableDates` (matches PATCH /venues/:id/availability).
  * @returns {{ message?: string; venue: unknown }}
  */
 export async function patchVenueAvailability(id, body) {

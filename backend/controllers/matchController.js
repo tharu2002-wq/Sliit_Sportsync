@@ -2,6 +2,7 @@ const Match = require("../models/Match");
 const Event = require("../models/Event");
 const Team = require("../models/Team");
 const Venue = require("../models/Venue");
+const { venueSportError, venueUnavailableRangeError } = require("../utils/venueRules");
 
 // Convert "14:30" => total minutes
 const timeToMinutes = (time) => {
@@ -108,6 +109,16 @@ const createMatch = async (req, res) => {
       return res.status(400).json({
         message: "Venue is currently unavailable",
       });
+    }
+
+    const sportErr = venueSportError(foundVenue, foundEvent.sportType);
+    if (sportErr) {
+      return res.status(400).json({ message: sportErr });
+    }
+
+    const unavailErr = venueUnavailableRangeError(foundVenue, matchDateOnly, matchDateOnly);
+    if (unavailErr) {
+      return res.status(400).json({ message: unavailErr });
     }
 
     if (foundEvent.teams && foundEvent.teams.length > 0) {
@@ -334,6 +345,22 @@ const updateMatch = async (req, res) => {
     const foundVenue = await Venue.findById(finalVenue);
     if (!foundVenue) {
       return res.status(404).json({ message: "Venue not found" });
+    }
+
+    if (foundVenue.status !== "available" && finalStatus !== "completed" && finalStatus !== "cancelled") {
+      return res.status(400).json({
+        message: "Venue is currently unavailable",
+      });
+    }
+
+    const sportErr = venueSportError(foundVenue, foundEvent.sportType);
+    if (sportErr) {
+      return res.status(400).json({ message: sportErr });
+    }
+
+    const unavailErr = venueUnavailableRangeError(foundVenue, finalMatchDateOnly, finalMatchDateOnly);
+    if (unavailErr) {
+      return res.status(400).json({ message: unavailErr });
     }
 
     if (foundEvent.teams && foundEvent.teams.length > 0) {

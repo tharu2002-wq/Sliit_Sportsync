@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getPlayers } from "../../../api/players";
+import { deletePlayer, getPlayers } from "../../../api/players";
 import { AdminPlayersTable } from "../../../components/admin/players/AdminPlayersTable";
 import { Button } from "../../../components/ui/Button";
 import { SearchBar } from "../../../components/ui/SearchBar";
@@ -15,6 +15,8 @@ export default function AdminPlayersListPage() {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [removeError, setRemoveError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   const load = useCallback(async () => {
@@ -50,6 +52,24 @@ export default function AdminPlayersListPage() {
     });
   }, [players, searchQuery]);
 
+  const handleRemovePlayer = async (id, fullName) => {
+    const ok = window.confirm(
+      `Remove player "${fullName}"? They will be removed from team rosters and event participant lists. This cannot be undone.`
+    );
+    if (!ok) return;
+
+    setRemoveError("");
+    setDeletingId(id);
+    try {
+      await deletePlayer(id);
+      setPlayers((prev) => prev.filter((p) => String(p._id) !== id));
+    } catch (err) {
+      setRemoveError(getApiErrorMessage(err, "Could not remove player."));
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div>
       <div className="flex flex-col gap-4 border-b border-gray-100 pb-6 md:flex-row md:items-end md:justify-between">
@@ -70,13 +90,19 @@ export default function AdminPlayersListPage() {
         </p>
       ) : null}
 
+      {removeError ? (
+        <p className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+          {removeError}
+        </p>
+      ) : null}
+
       <div className="mt-6">
         <SearchBar
           id="admin-players-search"
           label="Search"
           value={searchQuery}
           onChange={setSearchQuery}
-          placeholder="Search by name, ID, email, department, team, or sports…"
+          placeholder="Search by name, ID, email, faculty, team, or sports…"
         />
       </div>
 
@@ -96,7 +122,11 @@ export default function AdminPlayersListPage() {
             No players match the current search.
           </p>
         ) : (
-          <AdminPlayersTable players={filtered} />
+          <AdminPlayersTable
+            players={filtered}
+            deletingId={deletingId}
+            onDeletePlayer={handleRemovePlayer}
+          />
         )}
       </div>
     </div>

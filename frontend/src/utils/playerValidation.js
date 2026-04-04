@@ -1,4 +1,5 @@
 import { PLAYER_DEPARTMENTS } from "../constants/playerDepartments";
+import { FACULTY_OPTIONS } from "../constants/studentProfileOptions";
 import { isDigitsOnlyText } from "./eventValidation";
 import { parseSportTypesInput } from "./playerFormUtils";
 import { getMySliitEmailError } from "./registrationValidation";
@@ -33,6 +34,19 @@ export function getPlayerDepartmentError(raw) {
   const d = String(raw ?? "").trim();
   if (!d) return "Department is required";
   if (!PLAYER_DEPARTMENTS.includes(d)) return "Select a valid department from the list.";
+  return null;
+}
+
+const FACULTY_VALUES = FACULTY_OPTIONS.map((o) => o.value);
+
+/**
+ * Player / admin forms: faculty must match student profile options (stored in API as `department`).
+ * @returns {string | null}
+ */
+export function getPlayerFacultyError(raw) {
+  const f = String(raw ?? "").trim();
+  if (!f) return "Faculty is required";
+  if (!FACULTY_VALUES.includes(f)) return "Select a valid faculty from the list.";
   return null;
 }
 

@@ -11,6 +11,13 @@ function normalizeUser(payload) {
     name: payload.name,
     email: payload.email,
     role: payload.role,
+    academicYear: payload.academicYear ?? undefined,
+    faculty: payload.faculty ?? undefined,
+    studentId: payload.studentId ?? undefined,
+    age:
+      typeof payload.age === "number" && Number.isInteger(payload.age) ? payload.age : undefined,
+    skills: Array.isArray(payload.skills) ? payload.skills : undefined,
+    createdAt: payload.createdAt ?? undefined,
   };
 }
 
@@ -52,6 +59,18 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  const updateUser = useCallback((partial) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = normalizeUser({ ...prev, ...partial });
+      const t = getAuthToken();
+      if (t && next) {
+        setAuthSession({ token: t, ...next });
+      }
+      return next;
+    });
+  }, []);
+
   const value = useMemo(
     () => ({
       user,
@@ -60,8 +79,9 @@ export function AuthProvider({ children }) {
       login,
       register,
       logout,
+      updateUser,
     }),
-    [user, token, login, register, logout]
+    [user, token, login, register, logout, updateUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -57,7 +57,7 @@ export default function StudentPlayersPage() {
           id="student-players-search"
           className="flex-1"
           label="Search players"
-          placeholder="Search by name, student ID, email, or department…"
+          placeholder="Search by name, student ID, email, or faculty…"
           value={searchQuery}
           onChange={setSearchQuery}
         />

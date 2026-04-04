@@ -1,5 +1,97 @@
 @import "tailwindcss";
 
+@keyframes event-ongoing-live {
+  0%,
+  100% {
+    border-color: rgb(110 231 183 / 0.65);
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0.2);
+  }
+  50% {
+    border-color: rgb(52 211 153 / 0.95);
+    box-shadow: 0 4px 28px -6px rgb(16 185 129 / 0.45);
+  }
+}
+
+.event-card-ongoing-live {
+  animation: event-ongoing-live 2.4s ease-in-out infinite;
+}
+
+@keyframes happening-now-live-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(52 211 153 / 0.55);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scale(0.88);
+    box-shadow: 0 0 0 10px rgb(52 211 153 / 0);
+  }
+}
+
+@keyframes happening-now-shimmer {
+  0% {
+    transform: translateX(-120%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(220%) skewX(-12deg);
+  }
+}
+
+.event-happening-now {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem 0.35rem 0.65rem;
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgb(236 253 245);
+  background: linear-gradient(135deg, rgb(6 78 59 / 0.94), rgb(4 120 87 / 0.9));
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 0 0 1px rgb(52 211 153 / 0.4),
+    0 2px 4px rgb(0 0 0 / 0.1),
+    0 8px 24px -8px rgb(16 185 129 / 0.45);
+}
+
+.event-happening-now::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 42%,
+    rgb(255 255 255 / 0.14) 50%,
+    transparent 58%,
+    transparent 100%
+  );
+  animation: happening-now-shimmer 4s ease-in-out infinite;
+}
+
+.event-happening-now-dot {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: rgb(52 211 153);
+  animation: happening-now-live-dot 2s ease-in-out infinite;
+}
+
+.event-happening-now-text {
+  position: relative;
+  z-index: 1;
+}
+
 body {
   margin: 0;
 }

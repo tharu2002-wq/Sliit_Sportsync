@@ -13,6 +13,7 @@ import AdminTeamCreatePage from "./pages/admin/teams/AdminTeamCreatePage";
 import AdminTeamDetailPage from "./pages/admin/teams/AdminTeamDetailPage";
 import AdminPlayerFormPage from "./pages/admin/players/AdminPlayerFormPage";
 import AdminPlayersListPage from "./pages/admin/players/AdminPlayersListPage";
+import AdminPlayerRequestsPage from "./pages/admin/player-requests/AdminPlayerRequestsPage";
 import AdminTeamsListPage from "./pages/admin/teams/AdminTeamsListPage";
 import AdminVenueFormPage from "./pages/admin/venues/AdminVenueFormPage";
 import AdminVenuesListPage from "./pages/admin/venues/AdminVenuesListPage";
@@ -35,6 +36,7 @@ import StudentTeamsPage from "./pages/student/teams/StudentTeamsPage";
 import StudentVenueDetailPage from "./pages/student/venues/StudentVenueDetailPage";
 import StudentVenuesPage from "./pages/student/venues/StudentVenuesPage";
 import StudentLeaderboardPage from "./pages/student/leaderboard/StudentLeaderboardPage";
+import StudentEditProfilePage from "./pages/student/profile/StudentEditProfilePage";
 
 const ADMIN_PLACEHOLDER_SEGMENTS = ADMIN_NAV_ITEMS.filter(
   ({ segment }) =>
@@ -42,6 +44,7 @@ const ADMIN_PLACEHOLDER_SEGMENTS = ADMIN_NAV_ITEMS.filter(
     segment !== "matches" &&
     segment !== "teams" &&
     segment !== "players" &&
+    segment !== "player-requests" &&
     segment !== "venues" &&
     segment !== "results" &&
     segment !== "leaderboard-reports"
@@ -84,6 +87,7 @@ function App() {
           <Route path="new" element={<AdminPlayerFormPage />} />
           <Route path=":playerId/edit" element={<AdminPlayerFormPage />} />
         </Route>
+        <Route path="player-requests" element={<AdminPlayerRequestsPage />} />
         <Route path="venues" element={<Outlet />}>
           <Route index element={<AdminVenuesListPage />} />
           <Route path="new" element={<AdminVenueFormPage />} />
@@ -132,6 +136,7 @@ function App() {
           <Route path=":venueId" element={<StudentVenueDetailPage />} />
         </Route>
         <Route path="leaderboard" element={<StudentLeaderboardPage />} />
+        <Route path="profile/edit" element={<StudentEditProfilePage />} />
         <Route path=":section" element={<StudentSectionPage />} />
       </Route>
     </Routes>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { cancelEvent, getEvents } from "../../../api/events";
+import { cancelEvent, deleteCancelledEvent, getEvents } from "../../../api/events";
 import { AdminEventsTable } from "../../../components/admin/events/AdminEventsTable";
 import { ConfirmDialog } from "../../../components/admin/events/ConfirmDialog";
 import { Button } from "../../../components/ui/Button";
@@ -22,6 +22,8 @@ export default function AdminEventsListPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -60,6 +62,20 @@ export default function AdminEventsListPage() {
       setError(getApiErrorMessage(err, "Could not cancel event."));
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget?._id) return;
+    setDeleteLoading(true);
+    try {
+      await deleteCancelledEvent(deleteTarget._id);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not delete event."));
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -121,7 +137,11 @@ export default function AdminEventsListPage() {
             No events match the current filters. Try clearing search or status.
           </p>
         ) : (
-          <AdminEventsTable events={filtered} onCancelClick={setCancelTarget} />
+          <AdminEventsTable
+            events={filtered}
+            onCancelClick={setCancelTarget}
+            onDeleteClick={setDeleteTarget}
+          />
         )}
       </div>
 
@@ -139,6 +159,22 @@ export default function AdminEventsListPage() {
         loading={cancelLoading}
         onCancel={() => !cancelLoading && setCancelTarget(null)}
         onConfirm={handleCancelConfirm}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this event?"
+        message={
+          deleteTarget
+            ? `“${deleteTarget.title}” will be permanently removed, including its matches and results. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        danger
+        loading={deleteLoading}
+        onCancel={() => !deleteLoading && setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
       />
     </div>
   );
