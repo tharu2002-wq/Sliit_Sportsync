@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { cancelMatch, getMatches } from "../../../api/matches";
+import { cancelMatch, deleteCancelledMatch, getMatches } from "../../../api/matches";
 import { AdminMatchesTable } from "../../../components/admin/matches/AdminMatchesTable";
 import { ConfirmDialog } from "../../../components/admin/events/ConfirmDialog";
 import { Button } from "../../../components/ui/Button";
@@ -23,6 +23,13 @@ function searchBlob(m) {
   return [eventTitle, a, b, v, r].map(normalize).join(" ");
 }
 
+function matchSummaryLabel(m) {
+  const ev = typeof m.event === "object" && m.event?.title ? m.event.title : "This match";
+  const a = typeof m.teamA === "object" && m.teamA?.teamName ? m.teamA.teamName : "Team A";
+  const b = typeof m.teamB === "object" && m.teamB?.teamName ? m.teamB.teamName : "Team B";
+  return `${ev} (${a} vs ${b})`;
+}
+
 export default function AdminMatchesListPage() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +38,8 @@ export default function AdminMatchesListPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const load = useCallback(async () => {
     setError("");
@@ -68,6 +77,20 @@ export default function AdminMatchesListPage() {
       setError(getApiErrorMessage(err, "Could not cancel match."));
     } finally {
       setCancelLoading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget?._id) return;
+    setDeleteLoading(true);
+    try {
+      await deleteCancelledMatch(deleteTarget._id);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setError(getApiErrorMessage(err, "Could not delete match."));
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -130,7 +153,11 @@ export default function AdminMatchesListPage() {
             No matches match the current filters. Try clearing search or status.
           </p>
         ) : (
-          <AdminMatchesTable matches={filtered} onCancelClick={setCancelTarget} />
+          <AdminMatchesTable
+            matches={filtered}
+            onCancelClick={setCancelTarget}
+            onDeleteClick={setDeleteTarget}
+          />
         )}
       </div>
 
@@ -148,6 +175,22 @@ export default function AdminMatchesListPage() {
         loading={cancelLoading}
         onCancel={() => !cancelLoading && setCancelTarget(null)}
         onConfirm={handleCancelConfirm}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this match?"
+        message={
+          deleteTarget
+            ? `“${matchSummaryLabel(deleteTarget)}” will be permanently removed, including any result. This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        danger
+        loading={deleteLoading}
+        onCancel={() => !deleteLoading && setDeleteTarget(null)}
+        onConfirm={handleDeleteConfirm}
       />
     </div>
   );

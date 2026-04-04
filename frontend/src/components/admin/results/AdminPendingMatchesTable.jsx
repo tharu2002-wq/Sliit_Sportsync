@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { formatMatchDay, formatMatchTimeRange } from "../../../utils/matchUtils";
+import { formatMatchDay, formatMatchTimeRange, getMatchSportTypeLabel } from "../../../utils/matchUtils";
 
 export function AdminPendingMatchesTable({ matches }) {
   if (!matches.length) {
@@ -13,9 +13,14 @@ export function AdminPendingMatchesTable({ matches }) {
   return (
     <>
       <ul className="space-y-3 lg:hidden">
-        {matches.map((m) => (
+        {matches.map((m) => {
+          const sport = getMatchSportTypeLabel(m);
+          return (
           <li key={m._id} className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 shadow-sm">
             <p className="text-xs font-semibold text-amber-900">Awaiting result</p>
+            {sport ? (
+              <p className="mt-1 text-xs font-bold uppercase tracking-wide text-blue-700">{sport}</p>
+            ) : null}
             <p className="mt-1 font-bold text-gray-900">{m.event?.title ?? "Match"}</p>
             <p className="mt-1 text-sm text-gray-800">
               {m.teamA?.teamName} vs {m.teamB?.teamName}
@@ -32,13 +37,15 @@ export function AdminPendingMatchesTable({ matches }) {
               </Link>
             </div>
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       <div className="hidden overflow-x-auto rounded-2xl border border-amber-100 bg-amber-50/30 shadow-sm lg:block">
-        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[800px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-amber-100/80 bg-amber-50/80">
+              <th className="px-4 py-3 font-bold text-gray-700">Sport</th>
               <th className="px-4 py-3 font-bold text-gray-700">Event</th>
               <th className="px-4 py-3 font-bold text-gray-700">Match</th>
               <th className="px-4 py-3 font-bold text-gray-700">When</th>
@@ -49,6 +56,9 @@ export function AdminPendingMatchesTable({ matches }) {
           <tbody>
             {matches.map((m) => (
               <tr key={m._id} className="border-b border-amber-50/80 bg-white/60 last:border-0">
+                <td className="max-w-[8rem] truncate px-4 py-3 text-xs font-bold uppercase tracking-wide text-blue-700">
+                  {getMatchSportTypeLabel(m) || "—"}
+                </td>
                 <td className="px-4 py-3 font-medium text-gray-900">{m.event?.title ?? "—"}</td>
                 <td className="px-4 py-3 text-gray-700">
                   {m.teamA?.teamName} <span className="text-gray-400">vs</span> {m.teamB?.teamName}

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { formatMatchDay } from "../../../utils/matchUtils";
+import { formatMatchDay, getMatchSportTypeLabel } from "../../../utils/matchUtils";
 import { formatResultWinnerLabel } from "../../../utils/resultDisplayUtils";
 
 export function AdminResultsTable({ results, onDeleteClick }) {
@@ -18,9 +18,13 @@ export function AdminResultsTable({ results, onDeleteClick }) {
           const m = r.match;
           const teamA = m?.teamA?.teamName ?? "A";
           const teamB = m?.teamB?.teamName ?? "B";
+          const sport = m ? getMatchSportTypeLabel(m) : "";
           return (
             <li key={r._id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-              <p className="text-xs text-gray-500">{m?.event?.title ?? "Match"}</p>
+              {sport ? (
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">{sport}</p>
+              ) : null}
+              <p className={`text-xs text-gray-500 ${sport ? "mt-1" : ""}`}>{m?.event?.title ?? "Match"}</p>
               <p className="mt-1 font-bold text-gray-900">
                 {teamA} {r.scoreA} – {r.scoreB} {teamB}
               </p>
@@ -49,9 +53,10 @@ export function AdminResultsTable({ results, onDeleteClick }) {
       </ul>
 
       <div className="hidden overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-sm lg:block">
-        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[1040px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50/80">
+              <th className="px-4 py-3 font-bold text-gray-700">Sport</th>
               <th className="px-4 py-3 font-bold text-gray-700">Event</th>
               <th className="px-4 py-3 font-bold text-gray-700">Match</th>
               <th className="px-4 py-3 font-bold text-gray-700">Date</th>
@@ -65,8 +70,12 @@ export function AdminResultsTable({ results, onDeleteClick }) {
               const m = r.match;
               const teamA = m?.teamA?.teamName ?? "A";
               const teamB = m?.teamB?.teamName ?? "B";
+              const sport = m ? getMatchSportTypeLabel(m) : "";
               return (
                 <tr key={r._id} className="border-b border-gray-50 last:border-0">
+                  <td className="max-w-[8rem] truncate px-4 py-3 text-xs font-bold uppercase tracking-wide text-blue-700">
+                    {sport || "—"}
+                  </td>
                   <td className="max-w-[10rem] truncate px-4 py-3 font-medium text-gray-900">
                     {m?.event?.title ?? "—"}
                   </td>

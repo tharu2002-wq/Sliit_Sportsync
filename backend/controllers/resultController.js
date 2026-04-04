@@ -1,8 +1,66 @@
+const mongoose = require("mongoose");
 const Result = require("../models/Result");
 const Match = require("../models/Match");
 const Event = require("../models/Event");
-require("../models/Team");
+const Team = require("../models/Team");
 require("../models/Venue");
+const { MATCH_DETAIL_POPULATE } = require("../utils/matchPopulate");
+
+const MAX_PLAYER_NOTE_LEN = 500;
+
+async function rosterPlayerIdSet(teamAId, teamBId) {
+  const [ta, tb] = await Promise.all([
+    Team.findById(teamAId).select("captain members"),
+    Team.findById(teamBId).select("captain members"),
+  ]);
+  const set = new Set();
+  const add = (id) => {
+    if (id) set.add(String(id));
+  };
+  if (ta) {
+    add(ta.captain);
+    (ta.members || []).forEach(add);
+  }
+  if (tb) {
+    add(tb.captain);
+    (tb.members || []).forEach(add);
+  }
+  return set;
+}
+
+function parsePlayerNotesArray(raw, allowedIds) {
+  if (!Array.isArray(raw)) {
+    return { error: "playerNotes must be an array" };
+  }
+  const seen = new Set();
+  const out = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const pid = row.player;
+    if (!pid) {
+      return { error: "Each player note entry must include a player id" };
+    }
+    const idStr = String(pid);
+    if (!allowedIds.has(idStr)) {
+      return {
+        error:
+          "Each player note must reference a player on one of the teams in this match",
+      };
+    }
+    if (seen.has(idStr)) {
+      return { error: "Duplicate player in player notes" };
+    }
+    seen.add(idStr);
+    const note = typeof row.note === "string" ? row.note.trim() : "";
+    if (note.length > MAX_PLAYER_NOTE_LEN) {
+      return {
+        error: `Player notes must be at most ${MAX_PLAYER_NOTE_LEN} characters each`,
+      };
+    }
+    out.push({ player: new mongoose.Types.ObjectId(idStr), note });
+  }
+  return { value: out };
+}
 
 /**
  * When a result is saved, the match is marked completed — bump the parent event from
@@ -23,7 +81,7 @@ async function promoteEventToOngoingIfApplicable(eventId) {
 // @access  Private (Admin, Organizer)
 const createResult = async (req, res) => {
   try {
-    const { match, scoreA, scoreB, notes } = req.body;
+    const { match, scoreA, scoreB, notes, playerNotes } = req.body;
 
     if (!match || scoreA === undefined || scoreB === undefined) {
       return res.status(400).json({
@@ -51,6 +109,14 @@ const createResult = async (req, res) => {
       });
     }
 
+    const allowedIds = await rosterPlayerIdSet(foundMatch.teamA, foundMatch.teamB);
+    const rawNotes =
+      playerNotes === undefined || playerNotes === null ? [] : playerNotes;
+    const parsedNotes = parsePlayerNotesArray(rawNotes, allowedIds);
+    if (parsedNotes.error) {
+      return res.status(400).json({ message: parsedNotes.error });
+    }
+
     let winner = null;
 
     if (scoreA > scoreB) {
@@ -66,6 +132,7 @@ const createResult = async (req, res) => {
       winner,
       updatedBy: req.user._id,
       notes,
+      playerNotes: parsedNotes.value,
     });
 
     if (foundMatch.status !== "completed") {
@@ -78,15 +145,14 @@ const createResult = async (req, res) => {
     const populatedResult = await Result.findById(result._id)
       .populate({
         path: "match",
-        populate: [
-          { path: "event", select: "title sportType startDate endDate status description" },
-          { path: "teamA", select: "teamName sportType" },
-          { path: "teamB", select: "teamName sportType" },
-          { path: "venue", select: "venueName location" },
-        ],
+        populate: MATCH_DETAIL_POPULATE,
       })
       .populate("winner", "teamName sportType")
-      .populate("updatedBy", "name email role");
+      .populate("updatedBy", "name email role")
+      .populate({
+        path: "playerNotes.player",
+        select: "fullName studentId",
+      });
 
     return res.status(201).json(populatedResult);
   } catch (error) {
@@ -127,15 +193,14 @@ const getResultById = async (req, res) => {
     const result = await Result.findById(req.params.id)
       .populate({
         path: "match",
-        populate: [
-          { path: "event", select: "title sportType startDate endDate status description" },
-          { path: "teamA", select: "teamName sportType captain members" },
-          { path: "teamB", select: "teamName sportType captain members" },
-          { path: "venue", select: "venueName location capacity status" },
-        ],
+        populate: MATCH_DETAIL_POPULATE,
       })
       .populate("winner", "teamName sportType")
-      .populate("updatedBy", "name email role");
+      .populate("updatedBy", "name email role")
+      .populate({
+        path: "playerNotes.player",
+        select: "fullName studentId",
+      });
 
     if (!result) {
       return res.status(404).json({ message: "Result not found" });
@@ -152,7 +217,7 @@ const getResultById = async (req, res) => {
 // @access  Private (Admin, Organizer)
 const updateResult = async (req, res) => {
   try {
-    const { scoreA, scoreB, notes } = req.body;
+    const { scoreA, scoreB, notes, playerNotes } = req.body;
 
     const result = await Result.findById(req.params.id);
 
@@ -176,6 +241,16 @@ const updateResult = async (req, res) => {
     if (scoreB !== undefined) result.scoreB = scoreB;
     if (notes !== undefined) result.notes = notes;
 
+    if (playerNotes !== undefined) {
+      const allowedIds = await rosterPlayerIdSet(match.teamA, match.teamB);
+      const rawNotes = playerNotes === null ? [] : playerNotes;
+      const parsedNotes = parsePlayerNotesArray(rawNotes, allowedIds);
+      if (parsedNotes.error) {
+        return res.status(400).json({ message: parsedNotes.error });
+      }
+      result.playerNotes = parsedNotes.value;
+    }
+
     if (result.scoreA > result.scoreB) {
       result.winner = match.teamA;
     } else if (result.scoreB > result.scoreA) {
@@ -198,15 +273,14 @@ const updateResult = async (req, res) => {
     const populatedResult = await Result.findById(updatedResult._id)
       .populate({
         path: "match",
-        populate: [
-          { path: "event", select: "title sportType startDate endDate status description" },
-          { path: "teamA", select: "teamName sportType" },
-          { path: "teamB", select: "teamName sportType" },
-          { path: "venue", select: "venueName location" },
-        ],
+        populate: MATCH_DETAIL_POPULATE,
       })
       .populate("winner", "teamName sportType")
-      .populate("updatedBy", "name email role");
+      .populate("updatedBy", "name email role")
+      .populate({
+        path: "playerNotes.player",
+        select: "fullName studentId",
+      });
 
     return res.status(200).json(populatedResult);
   } catch (error) {
@@ -222,15 +296,14 @@ const getResultByMatchId = async (req, res) => {
     const result = await Result.findOne({ match: req.params.matchId })
       .populate({
         path: "match",
-        populate: [
-          { path: "event", select: "title sportType startDate endDate status description" },
-          { path: "teamA", select: "teamName sportType" },
-          { path: "teamB", select: "teamName sportType" },
-          { path: "venue", select: "venueName location" },
-        ],
+        populate: MATCH_DETAIL_POPULATE,
       })
       .populate("winner", "teamName sportType")
-      .populate("updatedBy", "name email role");
+      .populate("updatedBy", "name email role")
+      .populate({
+        path: "playerNotes.player",
+        select: "fullName studentId",
+      });
 
     if (!result) {
       return res.status(404).json({ message: "Result not found for this match" });

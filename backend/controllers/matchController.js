@@ -2,7 +2,9 @@ const Match = require("../models/Match");
 const Event = require("../models/Event");
 const Team = require("../models/Team");
 const Venue = require("../models/Venue");
+const Result = require("../models/Result");
 const { venueSportError, venueUnavailableRangeError } = require("../utils/venueRules");
+const { MATCH_DETAIL_POPULATE } = require("../utils/matchPopulate");
 
 // Convert "14:30" => total minutes
 const timeToMinutes = (time) => {
@@ -220,11 +222,7 @@ const getAllMatches = async (req, res) => {
 // @access  Private
 const getMatchById = async (req, res) => {
   try {
-    const match = await Match.findById(req.params.id)
-      .populate("event", "title sportType startDate endDate status description")
-      .populate("teamA", "teamName sportType captain members")
-      .populate("teamB", "teamName sportType captain members")
-      .populate("venue", "venueName location capacity status");
+    const match = await Match.findById(req.params.id).populate(MATCH_DETAIL_POPULATE);
 
     if (!match) {
       return res.status(404).json({ message: "Match not found" });
@@ -466,6 +464,32 @@ const cancelMatch = async (req, res) => {
   }
 };
 
+// @desc    Delete cancelled match (and its result if any)
+// @route   DELETE /api/matches/:id
+// @access  Private (Admin, Organizer)
+const deleteCancelledMatch = async (req, res) => {
+  try {
+    const match = await Match.findById(req.params.id);
+
+    if (!match) {
+      return res.status(404).json({ message: "Match not found" });
+    }
+
+    if (match.status !== "cancelled") {
+      return res.status(400).json({
+        message: "Only cancelled matches can be deleted",
+      });
+    }
+
+    await Result.deleteMany({ match: match._id });
+    await Match.findByIdAndDelete(match._id);
+
+    return res.status(200).json({ message: "Match deleted successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
 // @desc    Update match status
 // @route   PATCH /api/matches/:id/status
 // @access  Private (Admin, Organizer)
@@ -509,5 +533,6 @@ module.exports = {
   getMatchesByEvent,
   updateMatch,
   cancelMatch,
+  deleteCancelledMatch,
   updateMatchStatus,
 };

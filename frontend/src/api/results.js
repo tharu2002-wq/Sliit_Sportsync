@@ -17,7 +17,7 @@ export async function getResultByMatchId(matchId) {
 }
 
 /**
- * @param {{ match: string; scoreA: number; scoreB: number; notes?: string }} payload
+ * @param {{ match: string; scoreA: number; scoreB: number; notes?: string; playerNotes?: Array<{ player: string; note: string }> }} payload
  */
 export async function createResult(payload) {
   const { data } = await api.post("/results", payload);
@@ -26,7 +26,7 @@ export async function createResult(payload) {
 
 /**
  * @param {string} id
- * @param {{ scoreA?: number; scoreB?: number; notes?: string }} payload
+ * @param {{ scoreA?: number; scoreB?: number; notes?: string; playerNotes?: Array<{ player: string; note: string }> }} payload
  */
 export async function updateResult(id, payload) {
   const { data } = await api.put(`/results/${id}`, payload);

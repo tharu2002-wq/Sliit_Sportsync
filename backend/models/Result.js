@@ -33,6 +33,24 @@ const resultSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    playerNotes: {
+      type: [
+        {
+          player: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Player",
+            required: true,
+          },
+          note: {
+            type: String,
+            default: "",
+            trim: true,
+            maxlength: 500,
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,

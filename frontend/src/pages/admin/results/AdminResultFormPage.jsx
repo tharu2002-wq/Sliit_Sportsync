@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { getMatches } from "../../../api/matches";
+import { getMatchById, getMatches } from "../../../api/matches";
 import { createResult, getResultById, getResults, updateResult } from "../../../api/results";
 import { MatchResultSummary } from "../../../components/admin/results/MatchResultSummary";
+import { ResultPlayerNotesFields } from "../../../components/admin/results/ResultPlayerNotesFields";
 import { ResultScoreFields } from "../../../components/admin/results/ResultScoreFields";
 import { Button } from "../../../components/ui/Button";
 import { LoadingState } from "../../../components/ui/LoadingSpinner";
 import { SelectField } from "../../../components/ui/SelectField";
 import { getApiErrorMessage } from "../../../utils/apiError";
 import { matchesAwaitingResult } from "../../../utils/resultDisplayUtils";
-import { getResultNotesError, getScoreFieldError } from "../../../utils/resultValidation";
+import { getPlayerNoteError, getResultNotesError, getScoreFieldError } from "../../../utils/resultValidation";
+import {
+  buildPlayerNotesPayload,
+  collectTeamRoster,
+  playerNotesArrayToMap,
+} from "../../../utils/resultRosterUtils";
 
 const emptyScores = { scoreA: "", scoreB: "", notes: "" };
 
@@ -33,6 +39,10 @@ export default function AdminResultFormPage() {
   const [form, setForm] = useState(emptyScores);
   const [loadedMatch, setLoadedMatch] = useState(null);
   const [loadedResult, setLoadedResult] = useState(null);
+  const [detailMatch, setDetailMatch] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [playerNotesById, setPlayerNotesById] = useState({});
+  const [playerNoteErrors, setPlayerNoteErrors] = useState({});
 
   const updateForm = (patch) => setForm((prev) => ({ ...prev, ...patch }));
 
@@ -79,6 +89,58 @@ export default function AdminResultFormPage() {
   }, [isEdit, presetMatchId, pendingMatches]);
 
   useEffect(() => {
+    if (isEdit || !selectedMatchId) {
+      if (!isEdit && !selectedMatchId) setDetailMatch(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setDetailLoading(true);
+      try {
+        const m = await getMatchById(selectedMatchId);
+        if (cancelled) return;
+        if (String(m._id) !== String(selectedMatchId)) return;
+        setDetailMatch(m);
+      } catch {
+        if (!cancelled) setDetailMatch(null);
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, selectedMatchId]);
+
+  useEffect(() => {
+    if (isEdit || !detailMatch) return;
+    const next = {};
+    for (const p of collectTeamRoster(detailMatch.teamA)) next[p._id] = "";
+    for (const p of collectTeamRoster(detailMatch.teamB)) next[p._id] = "";
+    setPlayerNotesById(next);
+    setPlayerNoteErrors({});
+  }, [isEdit, detailMatch?._id]);
+
+  useEffect(() => {
+    if (!isEdit || !loadedResult) return;
+    const map = playerNotesArrayToMap(loadedResult.playerNotes);
+    const rm = loadedMatch;
+    if (!rm) {
+      setPlayerNotesById(map);
+      return;
+    }
+    const next = { ...map };
+    for (const p of collectTeamRoster(rm.teamA)) {
+      if (!(p._id in next)) next[p._id] = "";
+    }
+    for (const p of collectTeamRoster(rm.teamB)) {
+      if (!(p._id in next)) next[p._id] = "";
+    }
+    setPlayerNotesById(next);
+    setPlayerNoteErrors({});
+  }, [isEdit, loadedResult, loadedMatch]);
+
+  useEffect(() => {
     if (!isEdit || !resultId) {
       setLoadingResult(false);
       return;
@@ -113,11 +175,18 @@ export default function AdminResultFormPage() {
     return pendingMatches.find((m) => String(m._id) === String(selectedMatchId)) ?? null;
   }, [isEdit, loadedMatch, pendingMatches, selectedMatchId]);
 
-  const teamAName = selectedMatch?.teamA?.teamName ?? "Team A";
-  const teamBName = selectedMatch?.teamB?.teamName ?? "Team B";
+  const displayMatch = isEdit ? loadedMatch : detailMatch ?? selectedMatch;
+
+  const rosterMatch = isEdit ? loadedMatch : detailMatch;
+  const rosterA = useMemo(() => collectTeamRoster(rosterMatch?.teamA), [rosterMatch]);
+  const rosterB = useMemo(() => collectTeamRoster(rosterMatch?.teamB), [rosterMatch]);
+
+  const teamAName = displayMatch?.teamA?.teamName ?? "Team A";
+  const teamBName = displayMatch?.teamB?.teamName ?? "Team B";
 
   const validate = () => {
     const next = {};
+    const pnErr = {};
     if (!isEdit) {
       if (!selectedMatchId) next.match = "Select a match";
     }
@@ -127,8 +196,13 @@ export default function AdminResultFormPage() {
     if (bErr) next.scoreB = bErr;
     const nErr = getResultNotesError(form.notes);
     if (nErr) next.notes = nErr;
+    for (const p of [...rosterA, ...rosterB]) {
+      const e = getPlayerNoteError(playerNotesById[p._id] ?? "");
+      if (e) pnErr[p._id] = e;
+    }
     setFieldErrors(next);
-    return Object.keys(next).length === 0;
+    setPlayerNoteErrors(pnErr);
+    return Object.keys(next).length === 0 && Object.keys(pnErr).length === 0;
   };
 
   const handleSubmit = async (e) => {
@@ -139,11 +213,12 @@ export default function AdminResultFormPage() {
     const scoreA = Number.parseInt(form.scoreA, 10);
     const scoreB = Number.parseInt(form.scoreB, 10);
     const notes = form.notes.trim();
+    const playerNotes = buildPlayerNotesPayload(playerNotesById);
     try {
       if (isEdit && resultId) {
-        await updateResult(resultId, { scoreA, scoreB, notes });
+        await updateResult(resultId, { scoreA, scoreB, notes, playerNotes });
       } else {
-        await createResult({ match: selectedMatchId, scoreA, scoreB, notes });
+        await createResult({ match: selectedMatchId, scoreA, scoreB, notes, playerNotes });
       }
       navigate("/admin/results", { replace: true });
     } catch (err) {
@@ -235,7 +310,58 @@ export default function AdminResultFormPage() {
           </div>
         ) : null}
 
-        {selectedMatch ? <MatchResultSummary match={selectedMatch} /> : null}
+        {!isEdit && selectedMatchId && detailLoading ? (
+          <p className="text-sm text-gray-500">Loading team rosters…</p>
+        ) : null}
+
+        {displayMatch ? <MatchResultSummary match={displayMatch} /> : null}
+
+        {rosterMatch ? (
+          <div className="space-y-8 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500">Team rosters and player notes</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Optional notes per player (e.g. performance, discipline). Only players listed on each team appear here.
+              </p>
+            </div>
+            <div>
+              <h3 className="mb-3 text-base font-black text-gray-900">{teamAName}</h3>
+              <ResultPlayerNotesFields
+                teamName={teamAName}
+                players={rosterA}
+                notesByPlayerId={playerNotesById}
+                onPlayerNoteChange={(playerId, note) => {
+                  setPlayerNotesById((prev) => ({ ...prev, [playerId]: note }));
+                  setPlayerNoteErrors((prev) => {
+                    if (!prev[playerId]) return prev;
+                    const next = { ...prev };
+                    delete next[playerId];
+                    return next;
+                  });
+                }}
+                errors={playerNoteErrors}
+              />
+            </div>
+            <div>
+              <h3 className="mb-3 text-base font-black text-gray-900">{teamBName}</h3>
+              <ResultPlayerNotesFields
+                teamName={teamBName}
+                players={rosterB}
+                notesByPlayerId={playerNotesById}
+                onPlayerNoteChange={(playerId, note) => {
+                  setPlayerNotesById((prev) => ({ ...prev, [playerId]: note }));
+                  setPlayerNoteErrors((prev) => {
+                    if (!prev[playerId]) return prev;
+                    const next = { ...prev };
+                    delete next[playerId];
+                    return next;
+                  });
+                }}
+                errors={playerNoteErrors}
+              />
+            </div>
+          </div>
+        ) : null}
 
         {isEdit && loadedResult ? (
           <p className="text-sm text-gray-600">
@@ -270,7 +396,16 @@ export default function AdminResultFormPage() {
         />
 
         <div className="flex flex-wrap gap-3 border-t border-gray-100 pt-6">
-          <Button type="submit" variant="primary" size="sm" disabled={saving || (!isEdit && pendingMatches.length === 0)}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={
+              saving ||
+              (!isEdit && pendingMatches.length === 0) ||
+              (!isEdit && Boolean(selectedMatchId) && detailLoading)
+            }
+          >
             {saving ? "Saving…" : isEdit ? "Save changes" : "Record result"}
           </Button>
           <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => navigate("/admin/results")}>

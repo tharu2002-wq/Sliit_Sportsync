@@ -20,6 +20,7 @@ import AdminVenuesListPage from "./pages/admin/venues/AdminVenuesListPage";
 import AdminResultFormPage from "./pages/admin/results/AdminResultFormPage";
 import AdminResultsListPage from "./pages/admin/results/AdminResultsListPage";
 import AdminLeaderboardPage from "./pages/admin/leaderboard/AdminLeaderboardPage";
+import AdminDashboardOverviewPage from "./pages/admin/AdminDashboardOverviewPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/auth/LoginPage";
 import RegisterPage from "./pages/auth/RegisterPage";
@@ -40,6 +41,7 @@ import StudentEditProfilePage from "./pages/student/profile/StudentEditProfilePa
 
 const ADMIN_PLACEHOLDER_SEGMENTS = ADMIN_NAV_ITEMS.filter(
   ({ segment }) =>
+    segment !== "overview" &&
     segment !== "events" &&
     segment !== "matches" &&
     segment !== "teams" &&
@@ -67,6 +69,7 @@ function App() {
         }
       >
         <Route index element={<Navigate to="overview" replace />} />
+        <Route path="overview" element={<AdminDashboardOverviewPage />} />
         <Route path="events" element={<Outlet />}>
           <Route index element={<AdminEventsListPage />} />
           <Route path="new" element={<AdminEventFormPage />} />
