@@ -2,11 +2,7 @@ const Player = require("../models/Player");
 const PlayerRequest = require("../models/PlayerRequest");
 const User = require("../models/User");
 
-/**
- * @desc    Student submits a request to be registered as a player
- * @route   POST /api/player-requests
- * @access  Private (student)
- */
+
 const createPlayerRequest = async (req, res) => {
   try {
     if (req.user.role !== "student") {
