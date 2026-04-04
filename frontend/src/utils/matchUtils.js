@@ -46,6 +46,22 @@ export function filterMatches(matches, { searchQuery, sportType }) {
   });
 }
 
+/**
+ * Sport label for display (event is authoritative; falls back to team).
+ * @param {Record<string, unknown> | null | undefined} match
+ * @returns {string}
+ */
+export function getMatchSportTypeLabel(match) {
+  if (!match || typeof match !== "object") return "";
+  const ev = match.event?.sportType;
+  if (typeof ev === "string" && ev.trim()) return ev.trim();
+  const a = match.teamA?.sportType;
+  const b = match.teamB?.sportType;
+  const fromTeam =
+    typeof a === "string" && a.trim() ? a.trim() : typeof b === "string" && b.trim() ? b.trim() : "";
+  return fromTeam;
+}
+
 export function formatMatchDay(iso) {
   try {
     const d = new Date(iso);

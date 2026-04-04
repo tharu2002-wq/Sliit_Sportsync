@@ -8,6 +8,7 @@ const {
   getMatchesByEvent,
   updateMatch,
   cancelMatch,
+  deleteCancelledMatch,
   updateMatchStatus,
 } = require("../controllers/matchController");
 
@@ -29,6 +30,12 @@ router.patch(
   protect,
   authorizeRoles("admin", "organizer"),
   updateMatchStatus
+);
+router.delete(
+  "/:id",
+  protect,
+  authorizeRoles("admin", "organizer"),
+  deleteCancelledMatch
 );
 
 module.exports = router;

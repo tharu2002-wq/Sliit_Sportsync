@@ -36,3 +36,8 @@ export async function cancelMatch(id) {
   const { data } = await api.patch(`/matches/${id}/cancel`);
   return data;
 }
+
+export async function deleteCancelledMatch(id) {
+  const { data } = await api.delete(`/matches/${id}`);
+  return data;
+}

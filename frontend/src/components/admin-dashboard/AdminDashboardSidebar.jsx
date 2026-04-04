@@ -40,7 +40,7 @@ export function AdminDashboardSidebar({ className, onNavigate }) {
         </div>
       </div>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3 lg:overflow-hidden" aria-label="Admin dashboard">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3" aria-label="Admin dashboard">
         {ADMIN_NAV_ITEMS.map(({ segment, label }) => (
           <DashboardNavLink key={segment} to={`/admin/${segment}`} onClick={onNavigate}>
             {label}
@@ -48,12 +48,7 @@ export function AdminDashboardSidebar({ className, onNavigate }) {
         ))}
       </nav>
 
-      <footer className="border-t border-gray-100 px-3 py-3 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">SLIIT SportSync</p>
-        <p className="mt-1 text-[10px] leading-snug text-gray-400">Administration</p>
-      </footer>
-
-      <div className="border-t border-gray-100 p-3">
+      <div className="shrink-0 border-t border-gray-100 p-3">
         <button
           type="button"
           onClick={handleLogout}
