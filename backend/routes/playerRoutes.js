@@ -9,6 +9,7 @@ const {
   updatePlayer,
   deletePlayer,
 } = require("../controllers/playerController");
+const { getPlayerAiSummary } = require("../controllers/aiController");
 
 const { protect, authorizeRoles } = require("../middleware/authMiddleware");
 
@@ -20,6 +21,9 @@ router.get("/", protect, getAllPlayers);
 
 // Linked player(s) for logged-in user (must be registered before /:id)
 router.get("/me", protect, getPlayersForCurrentUser);
+
+// AI summary (must be before /:id so "ai-summary" is not captured as id)
+router.get("/:id/ai-summary", protect, getPlayerAiSummary);
 
 // Get single player
 router.get("/:id", protect, getPlayerById);
