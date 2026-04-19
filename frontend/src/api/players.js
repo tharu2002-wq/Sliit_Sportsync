@@ -20,6 +20,16 @@ export async function getPlayerById(id) {
 }
 
 /**
+ * Server-side Gemini summary: teams, matches, scores, and per-player result notes.
+ * @param {string} id Player id
+ * @returns {Promise<{ summary: string; model?: string }>}
+ */
+export async function getPlayerAiSummary(id) {
+  const { data } = await api.get(`/players/${id}/ai-summary`, { timeout: 90_000 });
+  return data;
+}
+
+/**
  * @param {Record<string, unknown>} payload
  */
 export async function createPlayer(payload) {

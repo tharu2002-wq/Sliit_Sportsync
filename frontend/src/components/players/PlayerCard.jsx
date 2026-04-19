@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Button } from "../ui/Button";
 import { cn } from "../../utils/cn";
 import { formatPlayerTeamsLine } from "../../utils/playerDisplayUtils";
 import { formatGender } from "../../utils/playerUtils";
+import { PlayerAiSummaryModal } from "./PlayerAiSummaryModal";
 
 /**
  * Player summary card with image, meta, and link to detail route.
@@ -9,6 +11,7 @@ import { formatGender } from "../../utils/playerUtils";
  * @param {{ compact?: boolean }} [props] — `compact` uses a denser layout (e.g. profile participation).
  */
 export function PlayerCard({ player, imageSrc, detailTo, className, compact = false }) {
+  const [aiOpen, setAiOpen] = useState(false);
   const sports = Array.isArray(player.sportTypes) ? player.sportTypes.filter(Boolean) : [];
   const sportsPreview = sports.slice(0, 2);
   const more = sports.length > 2 ? ` +${sports.length - 2}` : "";
@@ -16,6 +19,7 @@ export function PlayerCard({ player, imageSrc, detailTo, className, compact = fa
   const teamLine = teamsFormatted !== "—" ? teamsFormatted : "No team assigned yet";
 
   return (
+    <>
     <article
       className={cn(
         "flex h-full flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm ring-1 ring-gray-100 transition-shadow hover:shadow-md",
@@ -86,17 +90,39 @@ export function PlayerCard({ player, imageSrc, detailTo, className, compact = fa
         >
           {player.email ? `${player.email}` : "—"}
         </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          fullWidth
-          to={detailTo}
-          className={cn("mt-auto", compact && "mt-2 py-1.5 text-xs")}
-        >
-          View details
-        </Button>
+        <div className={cn("mt-auto flex flex-col gap-2", compact && "mt-2")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            fullWidth
+            to={detailTo}
+            className={cn(compact && "py-1.5 text-xs")}
+          >
+            View details
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            fullWidth
+            onClick={() => setAiOpen(true)}
+            className={cn(
+              "border-violet-200 font-semibold text-violet-800 hover:bg-violet-50",
+              compact && "py-1.5 text-xs"
+            )}
+          >
+            AI summary
+          </Button>
+        </div>
       </div>
     </article>
+    <PlayerAiSummaryModal
+      playerId={String(player._id)}
+      playerName={player.fullName ?? "Player"}
+      open={aiOpen}
+      onClose={() => setAiOpen(false)}
+    />
+    </>
   );
 }
